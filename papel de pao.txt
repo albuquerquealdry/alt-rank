@@ -1,0 +1,40 @@
+Config Routers 
+    Criar NS:
+        sudo ip netns add ns-router-1
+        sudo ip netns add ns-router-2
+        sudo ip netns add ns-router-3
+    Criar veth paar conectar routers:
+        sudo ip link add veth-router1 type veth peer name veth-router1-p
+        sudo ip link add veth-router2 type veth peer name veth-router2-p
+        sudo ip link add veth-router3 type veth peer name veth-router3-p
+    Atribuir Interfaces
+        Router1:
+            sudo ip link set veth-router1 netns ns-router-1
+            sudo ip link set veth-router1-p netns ns-router-2
+        Router2:
+            sudo ip link set veth-router2 netns ns-router-2
+            sudo ip link set veth-router2-p netns ns-router-3
+        Router3: 
+            sudo ip link set veth-router3 netns ns-router-3
+            sudo ip link set veth-router3-p netns ns-router-1
+    Habilitar Interfaces no namespace:
+        Router 1:
+            sudo ip netns exec ns-router-1 ip link set veth-router1 up
+            sudo ip netns exec ns-router-1 ip link set lo up 
+        Router 2 :
+            sudo ip netns exec ns-router-2 ip link set veth-router1-p up
+            sudo ip netns exec ns-router-2 ip link set veth-router2 up
+            sudo ip netns exec ns-router-2 ip link set lo up
+        Router 3 :
+            sudo ip netns exec ns-router-3 ip link set veth-router2-p up
+            sudo ip netns exec ns-router-3 ip link set veth-router3 up
+            sudo ip netns exec ns-router-3 ip link set lo up
+    Config de Ip para interfaces em cada router:
+        Router1: 
+            sudo ip netns exec ns-router-1 ip addr add 192.168.1.1/24 dev veth-router1
+        Router2: 
+            sudo ip netns exec ns-router-2 ip addr add 192.168.2.1/24 dev veth-router1-p
+            sudo ip netns exec ns-router-2 ip addr add 192.168.3.1/24 dev veth-router2
+        Router3: 
+            sudo ip netns exec ns-router-3 ip addr add 192.168.4.1/24 dev veth-router2-p
+            sudo ip netns exec ns-router-3 ip addr add 192.168.5.1/24 dev veth-router3

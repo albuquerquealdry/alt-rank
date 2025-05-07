@@ -1,0 +1,308 @@
+# Etapa 1: Criar os namespaces dos roteadores
+
+ip netns add r1
+ip netns add r2
+ip netns add r3
+
+# Etapa 2: Criar os cabos (veth) entre roteadores
+
+
+r1 <-> r2
+
+ip link add r1-r2 type veth peer name r2-r1
+ip link set r1-r2 netns r1
+ip link set r2-r1 netns r2
+
+r1 <-> r3
+
+ip link add r1-r3 type veth peer name r3-r1
+ip link set r1-r3 netns r1
+ip link set r3-r1 netns r3
+
+r2 <-> r3
+
+ip link add r2-r3 type veth peer name r3-r2
+ip link set r2-r3 netns r2
+ip link set r3-r2 netns r3
+
+
+# Etapa Atribuir IPs nas interfaces
+
+Dentro de cada namespace, vamos subir as interfaces e dar IP.
+Roteador r1:
+
+ip netns exec r1 ip addr add 10.0.1.1/30 dev r1-r2
+ip netns exec r1 ip addr add 10.0.2.1/30 dev r1-r3
+ip netns exec r1 ip link set r1-r2 up
+ip netns exec r1 ip link set r1-r3 up
+ip netns exec r1 ip link set lo up
+
+Roteador r2:
+
+ip netns exec r2 ip addr add 10.0.1.2/30 dev r2-r1
+ip netns exec r2 ip addr add 10.0.3.1/30 dev r2-r3
+ip netns exec r2 ip link set r2-r1 up
+ip netns exec r2 ip link set r2-r3 up
+ip netns exec r2 ip link set lo up
+
+Roteador r3:
+
+ip netns exec r3 ip addr add 10.0.2.2/30 dev r3-r1
+ip netns exec r3 ip addr add 10.0.3.2/30 dev r3-r2
+ip netns exec r3 ip link set r3-r1 up
+ip netns exec r3 ip link set r3-r2 up
+ip netns exec r3 ip link set lo up
+
+Etapa 4: Habilitar roteamento nos 3 roteadores
+
+Isso permite que eles encaminhem pacotes entre interfaces.
+
+ip netns exec r1 sysctl -w net.ipv4.ip_forward=1
+ip netns exec r2 sysctl -w net.ipv4.ip_forward=1
+ip netns exec r3 sysctl -w net.ipv4.ip_forward=1
+
+
+##############################################################################################################################################################
+
+1. Criar namespaces: switch e VMs
+
+ip netns add sw-r1
+ip netns add vm1-r1
+ip netns add vm2-r1
+ip netns add vm3-r1
+
+2. Criar veth pairs e conectar:
+
+    Cada VM ao switch
+
+    Roteador ao switch
+
+# VM1
+ip link add vm1-r1-veth type veth peer name sw-r1-vm1
+ip link set vm1-r1-veth netns vm1-r1
+ip link set sw-r1-vm1 netns sw-r1
+
+# VM2
+ip link add vm2-r1-veth type veth peer name sw-r1-vm2
+ip link set vm2-r1-veth netns vm2-r1
+ip link set sw-r1-vm2 netns sw-r1
+
+# VM3
+ip link add vm3-r1-veth type veth peer name sw-r1-vm3
+ip link set vm3-r1-veth netns vm3-r1
+ip link set sw-r1-vm3 netns sw-r1
+
+# Roteador
+ip link add r1-lan-veth type veth peer name sw-r1-r1
+ip link set r1-lan-veth netns r1
+ip link set sw-r1-r1 netns sw-r1
+
+3. Criar e configurar a bridge no switch
+
+ip netns exec sw-r1 ip link add br0 type bridge
+
+# Adicionar todas as pontas no switch à bridge
+ip netns exec sw-r1 ip link set sw-r1-vm1 master br0
+ip netns exec sw-r1 ip link set sw-r1-vm2 master br0
+ip netns exec sw-r1 ip link set sw-r1-vm3 master br0
+ip netns exec sw-r1 ip link set sw-r1-r1 master br0
+
+# Ativar bridge e interfaces
+ip netns exec sw-r1 ip link set br0 up
+ip netns exec sw-r1 ip link set sw-r1-vm1 up
+ip netns exec sw-r1 ip link set sw-r1-vm2 up
+ip netns exec sw-r1 ip link set sw-r1-vm3 up
+ip netns exec sw-r1 ip link set sw-r1-r1 up
+
+4. Configurar IPs e ativar interfaces nas VMs e roteador
+VM1
+
+ip netns exec vm1-r1 ip addr add 172.16.0.11/24 dev vm1-r1-veth
+ip netns exec vm1-r1 ip link set vm1-r1-veth up
+ip netns exec vm1-r1 ip link set lo up
+ip netns exec vm1-r1 ip route add default via 172.16.0.1
+
+VM2
+
+ip netns exec vm2-r1 ip addr add 172.16.0.12/24 dev vm2-r1-veth
+ip netns exec vm2-r1 ip link set vm2-r1-veth up
+ip netns exec vm2-r1 ip link set lo up
+ip netns exec vm2-r1 ip route add default via 172.16.0.1
+
+VM3
+
+ip netns exec vm3-r1 ip addr add 172.16.0.13/24 dev vm3-r1-veth
+ip netns exec vm3-r1 ip link set vm3-r1-veth up
+ip netns exec vm3-r1 ip link set lo up
+ip netns exec vm3-r1 ip route add default via 172.16.0.1
+
+Roteador r1 (interface LAN)
+
+ip netns exec r1 ip addr add 172.16.0.1/24 dev r1-lan-veth
+ip netns exec r1 ip link set r1-lan-veth up
+
+##############################################################################################################################################################
+
+1. Criar namespaces: switch e VMs
+
+ip netns add sw-r2
+ip netns add vm1-r2
+ip netns add vm2-r2
+ip netns add vm3-r2
+
+2. Criar veth pairs e conectar:
+
+# VM1
+ip link add vm1-r2-veth type veth peer name sw-r2-vm1
+ip link set vm1-r2-veth netns vm1-r2
+ip link set sw-r2-vm1 netns sw-r2
+
+# VM2
+ip link add vm2-r2-veth type veth peer name sw-r2-vm2
+ip link set vm2-r2-veth netns vm2-r2
+ip link set sw-r2-vm2 netns sw-r2
+
+# VM3
+ip link add vm3-r2-veth type veth peer name sw-r2-vm3
+ip link set vm3-r2-veth netns vm3-r2
+ip link set sw-r2-vm3 netns sw-r2
+
+# Roteador
+ip link add r2-lan-veth type veth peer name sw-r2-r2
+ip link set r2-lan-veth netns r2
+ip link set sw-r2-r2 netns sw-r2
+
+3. Criar e configurar a bridge no switch
+
+ip netns exec sw-r2 ip link add br0 type bridge
+
+# Adicionar todas as pontas no switch à bridge
+ip netns exec sw-r2 ip link set sw-r2-vm1 master br0
+ip netns exec sw-r2 ip link set sw-r2-vm2 master br0
+ip netns exec sw-r2 ip link set sw-r2-vm3 master br0
+ip netns exec sw-r2 ip link set sw-r2-r2 master br0
+
+# Ativar bridge e interfaces
+ip netns exec sw-r2 ip link set br0 up
+ip netns exec sw-r2 ip link set sw-r2-vm1 up
+ip netns exec sw-r2 ip link set sw-r2-vm2 up
+ip netns exec sw-r2 ip link set sw-r2-vm3 up
+ip netns exec sw-r2 ip link set sw-r2-r2 up
+
+4. Configurar IPs e ativar interfaces nas VMs e roteador
+VM1
+
+ip netns exec vm1-r2 ip addr add 172.17.0.11/24 dev vm1-r2-veth
+ip netns exec vm1-r2 ip link set vm1-r2-veth up
+ip netns exec vm1-r2 ip link set lo up
+ip netns exec vm1-r2 ip route add default via 172.17.0.1
+
+VM2
+
+ip netns exec vm2-r2 ip addr add 172.17.0.12/24 dev vm2-r2-veth
+ip netns exec vm2-r2 ip link set vm2-r2-veth up
+ip netns exec vm2-r2 ip link set lo up
+ip netns exec vm2-r2 ip route add default via 172.17.0.1
+
+VM3
+
+ip netns exec vm3-r2 ip addr add 172.17.0.13/24 dev vm3-r2-veth
+ip netns exec vm3-r2 ip link set vm3-r2-veth up
+ip netns exec vm3-r2 ip link set lo up
+ip netns exec vm3-r2 ip route add default via 172.17.0.1
+
+Roteador r2 (interface LAN)
+
+ip netns exec r2 ip addr add 172.17.0.1/24 dev r2-lan-veth
+ip netns exec r2 ip link set r2-lan-veth up
+
+##############################################################################################################################################################
+
+1. Criar namespaces: switch e VMs
+
+ip netns add sw-r3
+ip netns add vm1-r3
+ip netns add vm2-r3
+ip netns add vm3-r3
+
+2. Criar veth pairs e conectar:
+
+# VM1
+ip link add vm1-r3-veth type veth peer name sw-r3-vm1
+ip link set vm1-r3-veth netns vm1-r3
+ip link set sw-r3-vm1 netns sw-r3
+
+# VM2
+ip link add vm2-r3-veth type veth peer name sw-r3-vm2
+ip link set vm2-r3-veth netns vm2-r3
+ip link set sw-r3-vm2 netns sw-r3
+
+# VM3
+ip link add vm3-r3-veth type veth peer name sw-r3-vm3
+ip link set vm3-r3-veth netns vm3-r3
+ip link set sw-r3-vm3 netns sw-r3
+
+# Roteador
+ip link add r3-lan-veth type veth peer name sw-r3-r3
+ip link set r3-lan-veth netns r3
+ip link set sw-r3-r3 netns sw-r3
+
+3. Criar e configurar a bridge no switch
+
+ip netns exec sw-r3 ip link add br0 type bridge
+
+# Adicionar todas as pontas no switch à bridge
+ip netns exec sw-r3 ip link set sw-r3-vm1 master br0
+ip netns exec sw-r3 ip link set sw-r3-vm2 master br0
+ip netns exec sw-r3 ip link set sw-r3-vm3 master br0
+ip netns exec sw-r3 ip link set sw-r3-r3 master br0
+
+# Ativar bridge e interfaces
+ip netns exec sw-r3 ip link set br0 up
+ip netns exec sw-r3 ip link set sw-r3-vm1 up
+ip netns exec sw-r3 ip link set sw-r3-vm2 up
+ip netns exec sw-r3 ip link set sw-r3-vm3 up
+ip netns exec sw-r3 ip link set sw-r3-r3 up
+
+4. Configurar IPs e ativar interfaces nas VMs e roteador
+VM1
+
+ip netns exec vm1-r3 ip addr add 172.18.0.11/24 dev vm1-r3-veth
+ip netns exec vm1-r3 ip link set vm1-r3-veth up
+ip netns exec vm1-r3 ip link set lo up
+ip netns exec vm1-r3 ip route add default via 172.18.0.1
+
+VM2
+
+ip netns exec vm2-r3 ip addr add 172.18.0.12/24 dev vm2-r3-veth
+ip netns exec vm2-r3 ip link set vm2-r3-veth up
+ip netns exec vm2-r3 ip link set lo up
+ip netns exec vm2-r3 ip route add default via 172.18.0.1
+
+VM3
+
+ip netns exec vm3-r3 ip addr add 172.18.0.13/24 dev vm3-r3-veth
+ip netns exec vm3-r3 ip link set vm3-r3-veth up
+ip netns exec vm3-r3 ip link set lo up
+ip netns exec vm3-r3 ip route add default via 172.18.0.1
+
+Roteador r2 (interface LAN)
+
+ip netns exec r3 ip addr add 172.18.0.1/24 dev r3-lan-veth
+ip netns exec r3 ip link set r3-lan-veth up
+
+
+
+# Direcionar as rotas desconhecidas via link de cada router 
+
+ip netns exec r1 ip route add 172.17.0.0/24 via 10.0.1.2
+
+ip netns exec r1 ip route add 172.18.0.0/24 via 10.0.2.2
+
+ip netns exec r2 ip route add 172.16.0.0/24 via 10.0.1.1
+
+ip netns exec r2 ip route add 172.18.0.0/24 via 10.0.3.2
+
+ip netns exec r3 ip route add 172.16.0.0/24 via 10.0.2.1
+
+ip netns exec r3 ip route add 172.17.0.0/24 via 10.0.3.1

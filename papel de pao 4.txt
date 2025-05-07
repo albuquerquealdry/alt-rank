@@ -1,0 +1,217 @@
+# Criar Routers 
+
+ip netns add r1
+ip netns add r2
+ip netns add r3
+
+
+# Criar links entre roteadores
+
+# r1 <-> r2
+ip link add veth-r1-r2 type veth peer name veth-r2-r1
+ip link set veth-r1-r2 netns r1
+ip link set veth-r2-r1 netns r2
+
+# r1 <-> r3
+ip link add veth-r1-r3 type veth peer name veth-r3-r1
+ip link set veth-r1-r3 netns r1
+ip link set veth-r3-r1 netns r3
+
+# r2 <-> r3
+ip link add veth-r2-r3 type veth peer name veth-r3-r2
+ip link set veth-r2-r3 netns r2
+ip link set veth-r3-r2 netns r3
+
+
+# Atribuir Ips nas Interfaces
+
+# R1
+ip netns exec r1 ip addr add 10.0.1.1/30 dev veth-r1-r2
+ip netns exec r1 ip addr add 10.0.2.1/30 dev veth-r1-r3
+ip netns exec r1 ip link set veth-r1-r2 up
+ip netns exec r1 ip link set veth-r1-r3 up
+ip netns exec r1 ip link set lo up
+
+# R2
+ip netns exec r2 ip addr add 10.0.1.2/30 dev veth-r2-r1
+ip netns exec r2 ip addr add 10.0.3.1/30 dev veth-r2-r3
+ip netns exec r2 ip link set veth-r2-r1 up
+ip netns exec r2 ip link set veth-r2-r3 up
+ip netns exec r2 ip link set lo up
+
+# R3
+ip netns exec r3 ip addr add 10.0.2.2/30 dev veth-r3-r1
+ip netns exec r3 ip addr add 10.0.3.2/30 dev veth-r3-r2
+ip netns exec r3 ip link set veth-r3-r1 up
+ip netns exec r3 ip link set veth-r3-r2 up
+ip netns exec r3 ip link set lo up
+
+
+
+
+# Habilitar IP Forwarding
+ip netns exec r1 sysctl -w net.ipv4.ip_forward=1
+ip netns exec r2 sysctl -w net.ipv4.ip_forward=1
+ip netns exec r3 sysctl -w net.ipv4.ip_forward=1
+
+
+
+# Rotas entre os roteadores
+
+# R1
+ip netns exec r1 ip route add 172.17.0.0/24 via 10.0.1.2
+ip netns exec r1 ip route add 172.18.0.0/24 via 10.0.2.2
+
+# R2
+ip netns exec r2 ip route add 172.16.0.0/24 via 10.0.1.1
+ip netns exec r2 ip route add 172.18.0.0/24 via 10.0.3.2
+
+# R3
+ip netns exec r3 ip route add 172.16.0.0/24 via 10.0.2.1
+ip netns exec r3 ip route add 172.17.0.0/24 via 10.0.3.1
+
+
+######################################################################################################################################################33
+
+# Criar Switchs
+
+ip netns add sw1
+ip netns add sw2
+ip netns add sw3
+
+# Criar Link entre os switchs
+
+
+# R1 <-> SW1
+ip link add veth-r1-sw1 type veth peer name veth-sw1-r1
+ip link set veth-r1-sw1 netns r1
+ip link set veth-sw1-r1 netns sw1
+
+# R2 <-> SW2
+ip link add veth-r2-sw2 type veth peer name veth-sw2-r2
+ip link set veth-r2-sw2 netns r2
+ip link set veth-sw2-r2 netns sw2
+
+# R3 <-> SW3
+ip link add veth-r3-sw3 type veth peer name veth-sw3-r3
+ip link set veth-r3-sw3 netns r3
+ip link set veth-sw3-r3 netns sw3
+
+# Criar br0 dentro dos switchs e conectar a veth
+
+
+# SW1
+ip netns exec sw1 ip link add br0 type bridge
+ip netns exec sw1 ip link set br0 up
+ip netns exec sw1 ip link set veth-sw1-r1 master br0
+ip netns exec sw1 ip link set veth-sw1-r1 up
+
+# SW2
+ip netns exec sw2 ip link add br0 type bridge
+ip netns exec sw2 ip link set br0 up
+ip netns exec sw2 ip link set veth-sw2-r2 master br0
+ip netns exec sw2 ip link set veth-sw2-r2 up
+
+# SW3
+ip netns exec sw3 ip link add br0 type bridge
+ip netns exec sw3 ip link set br0 up
+ip netns exec sw3 ip link set veth-sw3-r3 master br0
+ip netns exec sw3 ip link set veth-sw3-r3 up
+
+# Ativar interfaces 
+
+# Ativar no namespace r1
+ip netns exec r1 ip link set veth-r1-sw1 up
+# Ativar no namespace r2
+ip netns exec r2 ip link set veth-r2-sw2 up
+# Ativar no namespace r3
+ip netns exec r3 ip link set veth-r3-sw3 up
+
+
+######################################################################################################################################################33
+
+# Criar vms
+
+# Para o switch sw1 (Roteador 1)
+ip netns add vm1-r1
+ip netns add vm2-r1
+ip netns add vm3-r1
+
+# Para o switch sw2 (Roteador 2)
+ip netns add vm1-r2
+ip netns add vm2-r2
+ip netns add vm3-r2
+
+# Para o switch sw3 (Roteador 3)
+ip netns add vm1-r3
+ip netns add vm2-r3
+ip netns add vm3-r3
+
+# Criar Links entre switchs e vms
+
+# Para o switch sw1 (Roteador 1)
+ip link add veth-vm1-sw1 type veth peer name veth-sw1-vm1
+ip link add veth-vm2-sw1 type veth peer name veth-sw1-vm2
+ip link add veth-vm3-sw1 type veth peer name veth-sw1-vm3
+
+# Para o switch sw2 (Roteador 2)
+ip link add veth-vm1-sw2 type veth peer name veth-sw2-vm1
+ip link add veth-vm2-sw2 type veth peer name veth-sw2-vm2
+ip link add veth-vm3-sw2 type veth peer name veth-sw2-vm3
+
+# Para o switch sw3 (Roteador 3)
+ip link add veth-vm1-sw3 type veth peer name veth-sw3-vm1
+ip link add veth-vm2-sw3 type veth peer name veth-sw3-vm2
+ip link add veth-vm3-sw3 type veth peer name veth-sw3-vm3
+
+# Conectar as veths a cada bridge de cada swicth
+
+
+# Para o switch sw1
+ip netns exec sw1 ip link set veth-sw1-vm1 master br0
+ip netns exec sw1 ip link set veth-sw1-vm2 master br0
+ip netns exec sw1 ip link set veth-sw1-vm3 master br0
+
+# Para o switch sw2
+ip netns exec sw2 ip link set veth-sw2-vm1 master br0
+ip netns exec sw2 ip link set veth-sw2-vm2 master br0
+ip netns exec sw2 ip link set veth-sw2-vm3 master br0
+
+# Para o switch sw3
+ip netns exec sw3 ip link set veth-sw3-vm1 master br0
+ip netns exec sw3 ip link set veth-sw3-vm2 master br0
+ip netns exec sw3 ip link set veth-sw3-vm3 master br0
+
+
+# Ativar veths em cada vm
+# Para as VMs no sw1
+ip netns exec vm1-r1 ip link set veth-vm1-sw1 up
+ip netns exec vm2-r1 ip link set veth-vm2-sw1 up
+ip netns exec vm3-r1 ip link set veth-vm3-sw1 up
+
+# Para as VMs no sw2
+ip netns exec vm1-r2 ip link set veth-vm1-sw2 up
+ip netns exec vm2-r2 ip link set veth-vm2-sw2 up
+ip netns exec vm3-r2 ip link set veth-vm3-sw2 up
+
+# Para as VMs no sw3
+ip netns exec vm1-r3 ip link set veth-vm1-sw3 up
+ip netns exec vm2-r3 ip link set veth-vm2-sw3 up
+ip netns exec vm3-r3 ip link set veth-vm3-sw3 up
+
+
+# Atribuir IP a cada vm 
+# VM1, VM2, VM3 no sw1 (Roteador 1)
+ip netns exec vm1-r1 ip addr add 172.16.0.2/24 dev veth-vm1-sw1
+ip netns exec vm2-r1 ip addr add 172.16.0.3/24 dev veth-vm2-sw1
+ip netns exec vm3-r1 ip addr add 172.16.0.4/24 dev veth-vm3-sw1
+
+# VM1, VM2, VM3 no sw2 (Roteador 2)
+ip netns exec vm1-r2 ip addr add 172.17.0.2/24 dev veth-vm1-sw2
+ip netns exec vm2-r2 ip addr add 172.17.0.3/24 dev veth-vm2-sw2
+ip netns exec vm3-r2 ip addr add 172.17.0.4/24 dev veth-vm3-sw2
+
+# VM1, VM2, VM3 no sw3 (Roteador 3)
+ip netns exec vm1-r3 ip addr add 172.18.0.2/24 dev veth-vm1-sw3
+ip netns exec vm2-r3 ip addr add 172.18.0.3/24 dev veth-vm2-sw3
+ip netns exec vm3-r3 ip addr add 172.18.0.4/24 dev veth-vm3-sw3

@@ -1,0 +1,83 @@
+# Cria a bridge
+sudo ip link add br0 type bridge
+
+# Sobe a bridge
+sudo ip link set br0 up
+
+# Cria namespace
+sudo ip netns add ns-R1
+sudo ip netns add ns-R2
+sudo ip netns add ns-R3
+
+# Cria veths e conecta na bridge
+sudo ip link add veth-R1 type veth peer name veth-br-R1
+sudo ip link add veth-R2 type veth peer name veth-br-R2
+sudo ip link add veth-R3 type veth peer name veth-br-R3
+
+# Coloca uma ponta em cada namespace
+sudo ip link set veth-R1 netns ns-R1
+sudo ip link set veth-R2 netns ns-R2
+sudo ip link set veth-R3 netns ns-R3
+
+# Conecta as outras pontas na bridge
+sudo ip link set veth-br-R1 master br0
+sudo ip link set veth-br-R2 master br0
+sudo ip link set veth-br-R3 master br0
+
+# Sobe interfaces da bridge
+sudo ip link set veth-br-R1 up
+sudo ip link set veth-br-R2 up
+sudo ip link set veth-br-R3 up
+
+# Configura IPs nos namespaces
+sudo ip netns exec ns-R1 ip addr add 10.0.0.1/24 dev veth-R1
+sudo ip netns exec ns-R2 ip addr add 10.0.0.2/24 dev veth-R2
+sudo ip netns exec ns-R3 ip addr add 10.0.0.3/24 dev veth-R3
+
+# Sobe as interfaces
+sudo ip netns exec ns-R1 ip link set veth-R1 up
+sudo ip netns exec ns-R2 ip link set veth-R2 up
+sudo ip netns exec ns-R3 ip link set veth-R3 up
+
+
+
+
+# Criar NS de switch
+sudo ip netns add ns-SW1
+sudo ip netns add ns-SW2
+sudo ip netns add ns-SW3
+
+#Criar Veth e conectar switch to Router
+sudo ip link add veth-R1-SW1 type veth peer name veth-SW1-R1
+sudo ip link add veth-R2-SW2 type veth peer name veth-SW2-R2
+sudo ip link add veth-R3-SW3 type veth peer name veth-SW3-R3
+
+# Coloca uma ponta em cada namespace Router
+sudo ip link set veth-R1-SW1 netns ns-R1
+sudo ip link set veth-R2-SW2 netns ns-R2
+sudo ip link set veth-R3-SW3 netns ns-R3
+
+# Coloca uma ponta em cada namespace SW
+sudo ip link set veth-SW1-R1 netns ns-SW1
+sudo ip link set veth-SW2-R2 netns ns-SW2
+sudo ip link set veth-SW3-R3 netns ns-SW3
+
+
+
+# Sobe interfaces do router para switch
+sudo ip netns exec ns-R1 ip link set  veth-R1-SW1 up
+sudo ip netns exec ns-R2 ip link set  veth-R2-SW2 up
+sudo ip netns exec ns-R3 ip link set  veth-R3-SW3 up
+
+
+
+# Sobe interfaces do switch para router
+sudo ip netns exec ns-SW1 ip link set  veth-SW1-R1 up
+sudo ip netns exec ns-SW2 ip link set  veth-SW2-R2 up
+sudo ip netns exec ns-SW3 ip link set  veth-SW3-R3 up
+
+
+# Adicionar Ips para os switchs
+sudo ip netns exec ns-SW1 ip addr add 172.16.0.0/24 dev veth-SW1-R1
+sudo ip netns exec  ns-SW2 ip addr add 172.17.0.0/24 dev veth-SW2-R2
+sudo ip netns exec  ns-SW3 ip addr add 172.18.0.0/24 dev veth-SW3-R3

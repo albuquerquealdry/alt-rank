@@ -1,0 +1,146 @@
+# Criar roteadores
+sudo ip netns add r1
+sudo ip netns add r2
+sudo ip netns add r3
+
+# Criar interfaces para routers
+sudo ip link add r1-r2 type veth peer name r2-r1
+sudo ip link add r1-r3 type veth peer name r3-r1
+sudo ip link add r2-r3 type veth peer name r3-r2
+
+# Plugar interfaces em cada router
+
+sudo ip link set r1-r2 netns r1
+sudo ip link set r2-r1 netns r2
+
+sudo ip link set r1-r3 netns r1
+sudo ip link set r3-r1 netns r3
+
+sudo ip link set r2-r3 netns r2
+sudo ip link set r3-r2 netns r3
+
+# Subir as interfaces nos routers
+sudo ip netns exec r1 ip link set lo up
+sudo ip netns exec r1 ip link set r1-r2 up
+sudo ip netns exec r1 ip link set r1-r3 up
+
+
+sudo ip netns exec r2 ip link set lo up
+sudo ip netns exec r2 ip link set r2-r1 up
+sudo ip netns exec r2 ip link set r2-r3 up
+
+sudo ip netns exec r3 ip link set lo up
+sudo ip netns exec r3 ip link set r3-r1 up
+sudo ip netns exec r3 ip link set r3-r2 up
+
+# Atribuir IP as interfaces 
+sudo ip netns exec r1 ip addr add 10.0.1.1/30 dev r1-r2
+sudo ip netns exec r1 ip addr add 10.0.2.1/30 dev r1-r3
+
+sudo ip netns exec r2 ip addr add 10.0.1.2/30 dev r2-r1
+sudo ip netns exec r2 ip addr add 10.0.3.1/30 dev r2-r3
+
+sudo ip netns exec r3 ip addr add 10.0.2.2/30 dev r3-r1
+sudo ip netns exec r3 ip addr add 10.0.3.2/30 dev r3-r2
+
+# Habilitar Ip Forwarding nos routers
+sudo ip netns exec r1 sysctl -w net.ipv4.ip_forward=1
+sudo ip netns exec r2 sysctl -w net.ipv4.ip_forward=1
+sudo ip netns exec r3 sysctl -w net.ipv4.ip_forward=1 
+
+
+
+
+# Criar Switchs
+
+sudo ip netns add sw-r1
+sudo ip netns add sw-r2
+sudo ip netns add sw-r3
+
+# Criar interfaces para switchs
+
+sudo ip link add r1-lan type veth peer name sw-r1-r1
+sudo ip link set r1-lan netns r1
+sudo ip link set sw-r1-r1 netns sw-r1
+sudo ip link add r2-lan type veth peer name sw-r2-r2
+sudo ip link set r2-lan netns r2
+sudo ip link set sw-r2-r2 netns sw-r2
+sudo ip link add r3-lan type veth peer name sw-r3-r3
+sudo ip link set r3-lan netns r3
+sudo ip link set sw-r3-r3 netns sw-r3
+
+# Criar bridges nos switchs e conectar as interfaces 
+
+sudo ip netns exec sw-r1 ip link add name br0 type bridge
+sudo ip netns exec sw-r1 ip link set br0 up
+
+sudo ip netns exec sw-r1 ip link set sw-r1-r1 master br0
+sudo ip netns exec sw-r1 ip link set sw-r1-r1 up
+
+sudo ip netns exec sw-r2 ip link add name br0 type bridge
+sudo ip netns exec sw-r2 ip link set br0 up
+
+
+sudo ip netns exec sw-r2 ip link set sw-r2-r2 master br0
+sudo ip netns exec sw-r2 ip link set sw-r2-r2 up
+
+
+sudo ip netns exec sw-r3 ip link add name br0 type bridge
+sudo ip netns exec sw-r3 ip link set br0 up
+
+
+sudo ip netns exec sw-r3 ip link set sw-r3-r3 master br0
+sudo ip netns exec sw-r3 ip link set sw-r3-r3 up
+
+# Atribuir IP nos routers 
+sudo ip netns exec r1 ip addr add 172.16.0.1/24 dev r1-lan
+sudo ip netns exec r2 ip addr add 172.17.0.1/24 dev r2-lan
+sudo ip netns exec r3 ip addr add 172.18.0.1/24 dev r3-lan
+
+
+
+
+# Criando namespaces das VMs
+sudo ip netns add vm1-r1
+sudo ip netns add vm2-r1
+sudo ip netns add vm3-r1
+
+# Criando interfaces para vms do sw 
+sudo ip link add vm1-r1-veth0 type veth peer name sw-r1-veth1
+sudo ip link add vm2-r1-veth0 type veth peer name sw-r1-veth2
+sudo ip link add vm3-r1-veth0 type veth peer name sw-r1-veth3
+
+# Movendo as interfaces veth para os namespaces das VMs
+sudo ip link set vm1-r1-veth0 netns vm1-r1
+sudo ip link set vm2-r1-veth0 netns vm2-r1
+sudo ip link set vm3-r1-veth0 netns vm3-r1
+
+
+# Movendo as interfaces para o namespace do switch
+sudo ip link set sw-r1-veth1 netns sw-r1
+sudo ip link set sw-r1-veth2 netns sw-r1
+sudo ip link set sw-r1-veth3 netns sw-r1
+
+# Ativando as interfaces das VMs
+sudo ip netns exec vm1-r1 ip link set dev vm1-r1-veth0 up
+sudo ip netns exec vm2-r1 ip link set dev vm2-r1-veth0 up
+sudo ip netns exec vm3-r1 ip link set dev vm3-r1-veth0 up
+
+
+sudo ip netns exec sw-r1 ip link set dev sw-r1-veth1 up
+sudo ip netns exec sw-r1 ip link set dev sw-r1-veth2 up
+sudo ip netns exec sw-r1 ip link set dev sw-r1-veth3 up
+
+
+# Atribuindo IP e rota default para vm1-r1
+sudo ip netns exec vm1-r1 ip addr add 172.16.0.2/24 dev vm1-r1-veth0
+sudo ip netns exec vm1-r1 ip route add default via 172.16.0.1
+
+# Atribuindo IP e rota default para vm2-r1
+sudo ip netns exec vm2-r1 ip addr add 172.16.0.3/24 dev vm2-r1-veth0
+sudo ip netns exec vm2-r1 ip route add default via 172.16.0.1
+
+
+# Atribuindo IP e rota default para vm3-r1
+sudo ip netns exec vm3-r1 ip addr add 172.16.0.4/24 dev vm3-r1-veth0
+sudo ip netns exec vm3-r1 ip route add default via 172.16.0.1
