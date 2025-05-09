@@ -143,12 +143,7 @@ ip netns exec r1 ip link set r1-lan-veth up
 
 ##############################################################################################################################################################
 
-1. Criar namespaces: switch e VMs
 
-ip netns add sw-r2
-ip netns add vm1-r2
-ip netns add vm2-r2
-ip netns add vm3-r2
 
 2. Criar veth pairs e conectar:
 
@@ -218,12 +213,7 @@ ip netns exec r2 ip link set r2-lan-veth up
 
 ##############################################################################################################################################################
 
-1. Criar namespaces: switch e VMs
 
-ip netns add sw-r3
-ip netns add vm1-r3
-ip netns add vm2-r3
-ip netns add vm3-r3
 
 2. Criar veth pairs e conectar:
 
